@@ -1,0 +1,24 @@
+# Terraform local artifacts
+.terraform/
+
+# Terraform state
+*.tfstate
+*.tfstate.*
+
+# Local variable overrides
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+
+# CLI/config overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Plan files
+*.tfplan

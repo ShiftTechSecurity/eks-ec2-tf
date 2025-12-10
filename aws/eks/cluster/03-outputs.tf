@@ -1,0 +1,50 @@
+###############################################################################################################################################################
+#####        █████╗ ██╗      ██████╗  ██████╗ ██╗  ██╗██╗██╗   ██╗███████╗     ██╗  ██╗     ██████╗ ██╗      █████╗ ███╗   ██╗██╗  ██╗                    #####
+#####       ██╔══██╗██║     ██╔════╝ ██╔═══██╗██║  ██║██║██║   ██║██╔════╝     ╚██╗██╔╝     ██╔══██╗██║     ██╔══██╗████╗  ██║██║ ██╔╝                    #####
+#####       ███████║██║     ██║  ███╗██║   ██║███████║██║██║   ██║█████╗        ╚███╔╝      ██████╔╝██║     ███████║██╔██╗ ██║█████╔╝                     #####
+#####       ██╔══██║██║     ██║   ██║██║   ██║██╔══██║██║╚██╗ ██╔╝██╔══╝        ██╔██╗      ██╔═══╝ ██║     ██╔══██║██║╚██╗██║██╔═██╗                     #####
+#####       ██║  ██║███████╗╚██████╔╝╚██████╔╝██║  ██║██║ ╚████╔╝ ███████╗     ██╔╝ ██╗     ██║     ███████╗██║  ██║██║ ╚████║██║  ██╗                    #####
+#####       ╚═╝  ╚═╝╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝     ╚═╝  ╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝                    #####
+###############################################################################################################################################################
+# Authors: Tristan Truckle & PLANK Team
+# Version: 1.0
+# Date: 15-01-2026
+# Subject: Terraform AWS Infrastructure Deployment Project for AlgoHive x Plank
+# Description:
+# Notes :
+###############################################################################################################################################################
+
+output "cluster_name" {
+  description = "EKS cluster name"
+  value       = aws_eks_cluster.this.name
+}
+
+output "cluster_arn" {
+  description = "EKS cluster ARN"
+  value       = aws_eks_cluster.this.arn
+}
+
+output "endpoint" {
+  description = "EKS cluster API endpoint"
+  value       = aws_eks_cluster.this.endpoint
+}
+
+output "cluster_version" {
+  description = "EKS Kubernetes version"
+  value       = aws_eks_cluster.this.version
+}
+
+output "oidc_issuer" {
+  description = "OIDC issuer URL"
+  value       = aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
+
+output "cluster_ca_data" {
+  description = "Base64 EKS cluster CA data"
+  value       = aws_eks_cluster.this.certificate_authority[0].data
+}
+
+output "effective_secrets_kms_key_arn" {
+  description = "KMS key ARN used for Kubernetes secrets encryption"
+  value       = local.effective_secrets_kms_key_arn
+}

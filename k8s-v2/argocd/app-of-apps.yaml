@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: algohive-root
+  namespace: argocd
+  # L'annotation finalizer garantit que ArgoCD supprime les ressources
+  # enfants si cette Application est elle-même supprimée (cascade delete)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ShiftTechSecurity/AlgoHive-x-Plank-wEKS.git
+    targetRevision: main
+    path: k8s-v2/argocd/apps
+  destination:
+    name: in-cluster
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true      # Supprime les ressources retirées du repo
+      selfHeal: true   # Resynchronise si quelqu'un modifie manuellement
+    syncOptions:
+      - CreateNamespace=true
