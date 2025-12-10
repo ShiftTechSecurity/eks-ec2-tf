@@ -1,0 +1,50 @@
+###############################################################################################################################################################
+#####        █████╗ ██╗      ██████╗  ██████╗ ██╗  ██╗██╗██╗   ██╗███████╗     ██╗  ██╗     ██████╗ ██╗      █████╗ ███╗   ██╗██╗  ██╗                    #####
+#####       ██╔══██╗██║     ██╔════╝ ██╔═══██╗██║  ██║██║██║   ██║██╔════╝     ╚██╗██╔╝     ██╔══██╗██║     ██╔══██╗████╗  ██║██║ ██╔╝                    #####
+#####       ███████║██║     ██║  ███╗██║   ██║███████║██║██║   ██║█████╗        ╚███╔╝      ██████╔╝██║     ███████║██╔██╗ ██║█████╔╝                     #####
+#####       ██╔══██║██║     ██║   ██║██║   ██║██╔══██║██║╚██╗ ██╔╝██╔══╝        ██╔██╗      ██╔═══╝ ██║     ██╔══██║██║╚██╗██║██╔═██╗                     #####
+#####       ██║  ██║███████╗╚██████╔╝╚██████╔╝██║  ██║██║ ╚████╔╝ ███████╗     ██╔╝ ██╗     ██║     ███████╗██║  ██║██║ ╚████║██║  ██╗                    #####
+#####       ╚═╝  ╚═╝╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝     ╚═╝  ╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝                    #####
+###############################################################################################################################################################
+# Authors: Tristan Truckle & PLANK Team
+# Version: 1.0
+# Date: 15-01-2026
+# Subject: Terraform AWS Infrastructure Deployment Project for AlgoHive x Plank
+# Description:
+# Notes :
+###############################################################################################################################################################
+
+output "dashboard_name" {
+  description = "CloudWatch dashboard name"
+  value       = aws_cloudwatch_dashboard.eks.dashboard_name
+}
+
+output "api_error_alarm_name" {
+  description = "CloudWatch alarm name for EKS API errors"
+  value       = aws_cloudwatch_metric_alarm.eks_api_errors.alarm_name
+}
+
+output "failed_nodes_alarm_name" {
+  description = "CloudWatch alarm name for EKS failed nodes"
+  value       = aws_cloudwatch_metric_alarm.eks_failed_nodes.alarm_name
+}
+
+output "node_cpu_alarm_name" {
+  description = "CloudWatch alarm name for high node CPU"
+  value       = aws_cloudwatch_metric_alarm.node_cpu_high.alarm_name
+}
+
+output "node_memory_alarm_name" {
+  description = "CloudWatch alarm name for high node memory"
+  value       = aws_cloudwatch_metric_alarm.node_memory_high.alarm_name
+}
+
+output "pending_pods_alarm_name" {
+  description = "CloudWatch alarm name for high pending pods count"
+  value       = aws_cloudwatch_metric_alarm.pending_pods_high.alarm_name
+}
+
+output "pod_restarts_alarm_name" {
+  description = "CloudWatch alarm name for high pod restart count"
+  value       = aws_cloudwatch_metric_alarm.pod_restarts_high.alarm_name
+}
