@@ -15,10 +15,6 @@
 ###############################################################################################################################################################
 
 ###############################################################################################################################################################
-# MAIN - Module Composition
-###############################################################################################################################################################
-
-###############################################################################################################################################################
 # NETWORK MODULES
 ###############################################################################################################################################################
 
@@ -62,17 +58,6 @@ module "public_routes" {
   private_subnet_ids = module.subnets.private_subnet_ids
 }
 
-# module "endpoints" {
-#   source = "./aws/network/endpoints"
-#   vpc_id = module.vpc.vpc_id
-#   private_subnet_ids = module.subnets.private_subnet_ids
-# }
-
-# module "security_groups" {
-#   source = "./aws/network/security-groups"
-#   vpc_id = module.vpc.vpc_id
-# }
-
 # ###############################################################################################################################################################
 # # IAM MODULES
 # ###############################################################################################################################################################
@@ -86,15 +71,6 @@ module "eks_node_role" {
   source       = "./aws/iam/eks-node-role"
   project_name = local.project
 }
-
-# module "oidc" {
-#   source = "./aws/iam/oidc"
-#   cluster_oidc_issuer = module.eks_cluster.oidc_issuer
-# }
-
-# module "iam_policies" {
-#   source = "./aws/iam/policies"
-# }
 
 # ###############################################################################################################################################################
 # # EKS MODULES
@@ -120,15 +96,6 @@ module "eks_cluster" {
 
   depends_on = [module.eks_cluster_role, module.eks_node_role]
 }
-
-# module "eks_nodes" {
-#   source = "./aws/eks/node-groups"
-#   cluster_name    = module.eks_cluster.cluster_name
-#   cluster_version = module.eks_cluster.cluster_version
-#   subnet_ids      = module.subnets.private_subnet_ids
-#   node_role_arn   = module.eks_node_role.role_arn
-#   tags            = local.tags
-# }
 
 module "eks_addons" {
   source = "./aws/eks/addons"
@@ -163,42 +130,6 @@ module "aws_auth" {
 }
 
 # ###############################################################################################################################################################
-# # COMPUTE MODULES
-# ###############################################################################################################################################################
-
-# module "launch_templates" {
-#   source = "./aws/compute/launch-templates"
-# }
-
-# ###############################################################################################################################################################
-# # LOAD BALANCING MODULES
-# ###############################################################################################################################################################
-
-# module "acm" {
-#   source = "./aws/security/acm"
-#   domain_name = var.domain_name
-# }
-
-# module "alb" {
-#   source = "./aws/load-balancing/alb"
-#   vpc_id          = module.vpc.vpc_id
-#   subnet_ids      = module.subnets.public_subnet_ids
-#   certificate_arn = module.acm.certificate_arn
-#   tags            = local.tags
-# }
-
-# module "target_groups" {
-#   source = "./aws/load-balancing/target-groups"
-#   vpc_id = module.vpc.vpc_id
-# }
-
-# module "listeners" {
-#   source = "./aws/load-balancing/listeners"
-#   alb_arn = module.alb.alb_arn
-#   target_group_arns = module.target_groups.target_group_arns
-# }
-
-# ###############################################################################################################################################################
 # # OBSERVABILITY MODULES
 # ###############################################################################################################################################################
 
@@ -216,26 +147,3 @@ module "cloudwatch" {
 
   depends_on = [module.eks_addons]
 }
-
-# module "logs" {
-#   source = "./aws/observability/logs"
-#   cloudwatch_log_group_name = module.cloudwatch.log_group_name
-# }
-
-# ###############################################################################################################################################################
-# # STORAGE MODULES
-# ###############################################################################################################################################################
-
-# module "ebs" {
-#   source = "./aws/storage/ebs"
-# }
-
-# module "ecr" {
-#   source = "./aws/storage/ecr"
-# }
-
-
-
-
-
-
