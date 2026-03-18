@@ -189,6 +189,12 @@ terraform output eks_cluster_endpoint
 terraform output cloudwatch_dashboard_name
 ```
 
+## Useful commands
+
+```bash
+aws eks update-kubeconfig --region eu-west-1 --name algohive-plank-dev
+```
+
 ## Notes
 
 - This repo currently uses one root stack and one backend state key.

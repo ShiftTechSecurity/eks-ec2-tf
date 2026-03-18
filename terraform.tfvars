@@ -1,4 +1,5 @@
 enable_eks_argocd_capability = true
+eks_endpoint_public_access = true
 
 eks_argocd_idc_instance_arn = "arn:aws:sso:::instance/ssoins-68040d02a7828ad3"
 eks_argocd_idc_region       = "eu-west-1"
