@@ -15,7 +15,7 @@ spec:
     targetRevision: HEAD
     path: k8s-v2/overlays/production/infrastructure
   destination:
-    server: https://8A38C5CFED93595E7AE35ACBC7A61DC3.gr7.eu-west-1.eks.amazonaws.com
+    server: https://kubernetes.default.svc
     namespace: algohive
   syncPolicy:
     automated:
