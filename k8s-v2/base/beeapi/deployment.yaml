@@ -24,6 +24,7 @@ spec:
       containers:
         - name: beeapi
           image: ghcr.io/algohive-coding-puzzles/beeapi-go:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 5000

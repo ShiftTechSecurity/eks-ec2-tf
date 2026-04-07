@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - ../../../base/namespace
   - ../../../base/configmap
-  - ../../../base/secrets
   - ../../../base/core/backend
   - ../../../base/core/client
   - ../../../base/core/beehub

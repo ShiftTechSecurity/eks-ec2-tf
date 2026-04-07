@@ -558,15 +558,10 @@ kubeseal \
   --controller-name=sealed-secrets-controller \
   --controller-namespace=kube-system \
   --format yaml \
-  > k8s-v2/base/secrets/sealed-secret.yaml
-
-# Pousser dans Git
-git add k8s-v2/base/secrets/sealed-secret.yaml
-git commit -m "feat: add sealed secret"
-git push
+  | kubectl apply -f -
 ```
 
-> ⚠️ Un SealedSecret est lié à un cluster spécifique. Il faut le régénérer si le cluster est recréé (nouvelle clé de chiffrement).
+> ⚠️ Dans l'implémentation actuelle, cette étape est rejouée par le workflow `argocd-bootstrap.yml` à partir des GitHub Secrets. Il faut la relancer si le cluster est recréé ou si les secrets changent.
 
 ---
 

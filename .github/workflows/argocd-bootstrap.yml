@@ -1,0 +1,191 @@
+name: ArgoCD Bootstrap (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to bootstrap"
+        required: false
+        default: "main"
+      cluster_name:
+        description: "EKS cluster name"
+        required: false
+        default: "algohive-plank-dev"
+      aws_region:
+        description: "AWS region override"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: argocd-bootstrap-main
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ github.event.inputs.aws_region != '' && github.event.inputs.aws_region || secrets.AWS_REGION }}
+      CLUSTER_NAME: ${{ github.event.inputs.cluster_name }}
+      K8S_NAMESPACE: algohive
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Install kubeseal
+        run: |
+          set -euo pipefail
+          KUBESEAL_VERSION=0.36.0
+          curl -fsSLo kubeseal.tar.gz "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz"
+          tar -xzf kubeseal.tar.gz kubeseal
+          sudo install -m 755 kubeseal /usr/local/bin/kubeseal
+          kubeseal --version
+
+      - name: Configure kubeconfig
+        run: |
+          set -euo pipefail
+          aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+          kubectl get nodes
+
+      - name: Wait for managed ArgoCD capability
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if kubectl get ns argocd >/dev/null 2>&1 && kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
+              echo "Managed ArgoCD capability is ready."
+              kubectl get ns argocd
+              kubectl get crd applications.argoproj.io
+              exit 0
+            fi
+            echo "Waiting for ArgoCD capability... attempt ${attempt}/30"
+            sleep 20
+          done
+          echo "ArgoCD capability did not become ready in time."
+          kubectl get ns argocd || true
+          kubectl get crd applications.argoproj.io || true
+          exit 1
+
+      - name: Install Sealed Secrets controller
+        run: |
+          set -euo pipefail
+          kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.36.0/controller.yaml
+          kubectl rollout status deployment/sealed-secrets-controller -n kube-system --timeout=300s
+
+      - name: Ensure application namespace exists
+        run: |
+          set -euo pipefail
+          kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Validate required GitHub Secrets
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          CACHE_PASSWORD: ${{ secrets.CACHE_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          required=(POSTGRES_PASSWORD JWT_SECRET DEFAULT_PASSWORD MAIL_PASSWORD CACHE_PASSWORD SECRET_KEY ADMIN_PASSWORD)
+          for key in "${required[@]}"; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required GitHub Secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Generate runtime SealedSecret from GitHub Secrets
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          CACHE_PASSWORD: ${{ secrets.CACHE_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          kubectl create secret generic algohive-secret \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=DEFAULT_PASSWORD="$DEFAULT_PASSWORD" \
+            --from-literal=MAIL_PASSWORD="$MAIL_PASSWORD" \
+            --from-literal=CACHE_PASSWORD="$CACHE_PASSWORD" \
+            --from-literal=SECRET_KEY="$SECRET_KEY" \
+            --from-literal=ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            --dry-run=client -o yaml | \
+          kubeseal \
+            --controller-name=sealed-secrets-controller \
+            --controller-namespace=kube-system \
+            --format yaml | \
+          kubectl apply -f -
+
+          for attempt in $(seq 1 20); do
+            if kubectl get secret algohive-secret -n "$K8S_NAMESPACE" >/dev/null 2>&1; then
+              echo "Runtime secret is available."
+              kubectl get secret algohive-secret -n "$K8S_NAMESPACE"
+              exit 0
+            fi
+            echo "Waiting for runtime secret... attempt ${attempt}/20"
+            sleep 10
+          done
+          echo "Secret algohive-secret was not materialized by Sealed Secrets."
+          kubectl get sealedsecrets.bitnami.com -n "$K8S_NAMESPACE" || true
+          exit 1
+
+      - name: Apply App of Apps
+        run: |
+          set -euo pipefail
+          kubectl apply -f k8s-v2/argocd/app-of-apps.yaml
+
+      - name: Wait for Applications to exist
+        run: |
+          set -euo pipefail
+          for app in algohive-root algohive-infrastructure algohive-core algohive-beeapi; do
+            for attempt in $(seq 1 20); do
+              if kubectl get application "$app" -n argocd >/dev/null 2>&1; then
+                echo "Application $app is present."
+                break
+              fi
+              echo "Waiting for application $app... attempt ${attempt}/20"
+              sleep 10
+            done
+            kubectl get application "$app" -n argocd
+          done
+
+      - name: Restart secret-consuming workloads when they already exist
+        run: |
+          set -euo pipefail
+          for deployment in algohive-db algohive-server beehub; do
+            if kubectl get deployment "$deployment" -n "$K8S_NAMESPACE" >/dev/null 2>&1; then
+              kubectl rollout restart deployment/"$deployment" -n "$K8S_NAMESPACE"
+              kubectl rollout status deployment/"$deployment" -n "$K8S_NAMESPACE" --timeout=300s
+            else
+              echo "Deployment $deployment not found yet, skipping restart."
+            fi
+          done
+
+      - name: Show cluster status
+        run: |
+          kubectl get applications -n argocd
+          kubectl get pods -n "$K8S_NAMESPACE" || true

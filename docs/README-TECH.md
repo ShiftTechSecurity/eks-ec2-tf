@@ -35,9 +35,6 @@ k8s-v2/
 │   ├── configmap/
 │   │   ├── configmap.yaml
 │   │   └── kustomization.yaml
-│   ├── secrets/
-│   │   ├── sealed-secret.yaml        # Secret chiffré (safe à commiter)
-│   │   └── kustomization.yaml
 │   ├── beeapi/                       # Template BeeAPI générique
 │   │   ├── deployment.yaml
 │   │   ├── service.yaml
@@ -201,8 +198,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/thfx31/Plank
-    targetRevision: HEAD
+    repoURL: https://github.com/ShiftTechSecurity/eks-ec2-tf.git
+    targetRevision: main
     path: k8s-v2/argocd/apps
   destination:
     server: https://kubernetes.default.svc
@@ -228,16 +225,25 @@ Secret K8s (plaintext)
     │
     ▼ kubeseal (chiffrement avec clé publique du cluster)
     │
-SealedSecret (chiffré, safe à commiter dans Git)
+SealedSecret (chiffré, généré au runtime)
     │
     ▼ controller sealed-secrets (déchiffrement dans le cluster)
     │
 Secret K8s (recréé automatiquement dans le cluster)
 ```
 
-### Régénérer le SealedSecret
+### Génération runtime du SealedSecret
 
-Si les secrets changent ou si le cluster est recréé, il faut régénérer le SealedSecret avec la clé publique du nouveau cluster :
+Dans l'implémentation actuelle, le `SealedSecret` n'est plus stocké dans Git.
+
+Le workflow `argocd-bootstrap.yml` :
+
+- lit les secrets applicatifs depuis GitHub Secrets ;
+- génère un `Secret` Kubernetes en mémoire ;
+- le scelle avec `kubeseal` ;
+- applique directement le résultat au cluster.
+
+Commande équivalente si besoin localement :
 
 ```bash
 kubectl create secret generic algohive-secret \
@@ -254,14 +260,10 @@ kubeseal \
   --controller-name=sealed-secrets-controller \
   --controller-namespace=kube-system \
   --format yaml \
-  > k8s-v2/base/secrets/sealed-secret.yaml
-
-git add k8s-v2/base/secrets/sealed-secret.yaml
-git commit -m "chore: update sealed secret"
-git push
+  | kubectl apply -f -
 ```
 
-> ⚠️ Un SealedSecret est lié à un cluster spécifique. Il faut le régénérer si le cluster est recréé.
+> ⚠️ Il faut relancer ce bootstrap si le cluster est recréé ou si les secrets applicatifs changent.
 
 ---
 
@@ -399,11 +401,10 @@ kubectl apply -f \
   https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.36.0/controller.yaml
 ```
 
-### Étape 3 — Générer et pousser le SealedSecret
+### Étape 3 — Générer le SealedSecret au runtime
 
 ```bash
-# (voir section 4 pour la commande complète)
-git push
+# Le workflow argocd-bootstrap.yml exécute cette étape automatiquement.
 ```
 
 ### Étape 4 — Bootstrap ArgoCD

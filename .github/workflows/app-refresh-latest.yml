@@ -1,0 +1,83 @@
+name: App Refresh Latest (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to use for the refresh workflow"
+        required: false
+        default: "main"
+      cluster_name:
+        description: "EKS cluster name"
+        required: false
+        default: "algohive-plank-dev"
+      aws_region:
+        description: "AWS region override"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-refresh-latest-main
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ github.event.inputs.aws_region != '' && github.event.inputs.aws_region || secrets.AWS_REGION }}
+      CLUSTER_NAME: ${{ github.event.inputs.cluster_name }}
+      K8S_NAMESPACE: algohive
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Configure kubeconfig
+        run: |
+          set -euo pipefail
+          aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+          kubectl get nodes
+
+      - name: Restart workloads using latest images
+        run: |
+          set -euo pipefail
+          deployments=(
+            algohive-server
+            algohive-client
+            beehub
+            beeapi-server-tlse
+            beeapi-server-mpl
+            beeapi-server-lyon
+            beeapi-server-staging
+          )
+
+          for deployment in "${deployments[@]}"; do
+            if kubectl get deployment "$deployment" -n "$K8S_NAMESPACE" >/dev/null 2>&1; then
+              echo "Restarting $deployment"
+              kubectl rollout restart deployment/"$deployment" -n "$K8S_NAMESPACE"
+              kubectl rollout status deployment/"$deployment" -n "$K8S_NAMESPACE" --timeout=300s
+            else
+              echo "::warning::Deployment $deployment not found in namespace $K8S_NAMESPACE"
+            fi
+          done
+
+      - name: Show application pod status
+        run: |
+          kubectl get pods -n "$K8S_NAMESPACE"
