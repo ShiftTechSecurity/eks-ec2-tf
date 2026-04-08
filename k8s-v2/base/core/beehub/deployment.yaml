@@ -14,6 +14,15 @@ spec:
       app: beehub
   template:
     metadata:
+      annotations:
+        cloudwatch.aws.amazon.com/auto-annotate-dotnet: "false"
+        cloudwatch.aws.amazon.com/auto-annotate-java: "false"
+        cloudwatch.aws.amazon.com/auto-annotate-nodejs: "false"
+        cloudwatch.aws.amazon.com/auto-annotate-python: "false"
+        instrumentation.opentelemetry.io/inject-dotnet: "false"
+        instrumentation.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        instrumentation.opentelemetry.io/inject-python: "false"
       labels:
         app: beehub
         app.kubernetes.io/name: beehub
@@ -32,6 +41,9 @@ spec:
                 name: algohive-config
             - secretRef:
                 name: algohive-secret
+          env:
+            - name: OTEL_AWS_APPLICATION_SIGNALS_RUNTIME_ENABLED
+              value: "false"
 
           readinessProbe:
             httpGet:
