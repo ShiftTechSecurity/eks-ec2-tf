@@ -15,7 +15,7 @@ spec:
     targetRevision: main
     path: k8s-v2/overlays/production/core
   destination:
-    name: in-cluster
+    server: https://kubernetes.default.svc
     namespace: algohive
   syncPolicy:
     automated:
