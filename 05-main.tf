@@ -30,6 +30,7 @@ module "subnets" {
   vpc_cidr           = var.vpc_cidr
   availability_zones = var.availability_zones
   project_name       = local.project
+  tags               = local.tags
 }
 
 

@@ -45,3 +45,9 @@ variable "vpc_id" {
   description = "The ID of the VPC"
   type        = string
 }
+
+variable "tags" {
+  description = "Common tags applied to subnet resources"
+  type        = map(string)
+  default     = {}
+}

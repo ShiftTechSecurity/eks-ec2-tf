@@ -43,6 +43,8 @@ Montrer que le projet couvre bien toute la chaîne suivante :
 - Namespace applicatif : `algohive`
 - Repo GitOps utilisé par ArgoCD : `https://github.com/ShiftTechSecurity/eks-ec2-tf.git`
 - Branche cible ArgoCD : `main`
+- Pour la démo, l'accès web peut se faire directement via les `ADDRESS` des Ingress AWS
+- Il n'est pas nécessaire de posséder `algohive.dev` pour la démo si les règles Ingress sont sans `host`
 
 > ⚠️ Certaines notes historiques dans `docs/` mentionnent encore `eu-west-3`. Pour la démo, suivre ce guide et la configuration active actuelle : `eu-west-1`.
 
@@ -205,7 +207,7 @@ Résultat attendu :
 - les Applications ArgoCD sont `Synced` et idéalement `Healthy`
 - les pods passent en `Running`
 - les services AlgoHive sont présents
-- l'Ingress est créé
+- les Ingress ont une `ADDRESS` AWS
 
 Pods attendus :
 
@@ -218,6 +220,19 @@ Pods attendus :
 - `beeapi-server-mpl`
 - `beeapi-server-lyon`
 - `beeapi-server-staging`
+
+Pour récupérer les URLs de démo :
+
+```bash
+kubectl get ingress -n algohive -o wide
+```
+
+Utiliser ensuite les valeurs du champ `ADDRESS` dans le navigateur :
+
+- `algohive-ingress` pour l'application principale
+- `beehub-ingress` pour BeeHub
+
+> ℹ️ Ces noms DNS AWS sont générés automatiquement et peuvent changer si l'Ingress est recréé.
 
 ---
 
@@ -382,7 +397,41 @@ Causes probables :
 
 ---
 
-### Problème 5 — Le refresh applicatif ne change rien
+### Problème 5 — L'Ingress n'a pas d'ADDRESS ou la page charge indéfiniment
+
+Symptômes :
+
+- `kubectl get ingress -n algohive` affiche une `ADDRESS` vide
+- ou l'URL AWS ne répond pas encore
+
+À vérifier :
+
+```bash
+kubectl get ingressclass
+kubectl describe ingress algohive-ingress -n algohive
+kubectl describe ingress beehub-ingress -n algohive
+```
+
+Points attendus :
+
+- `IngressClass` `alb` présente
+- événements `Successfully reconciled`
+- subnets publics taggés pour l'ALB
+
+Si les événements parlent de `couldn't auto-discover subnets` :
+
+- vérifier les tags subnet AWS :
+  - public : `kubernetes.io/role/elb=1`
+  - private : `kubernetes.io/role/internal-elb=1`
+
+Une fois l'`ADDRESS` visible :
+
+- attendre encore 1 à 3 minutes pour la propagation DNS AWS
+- puis ouvrir directement l'URL `http://<ADDRESS>`
+
+---
+
+### Problème 6 — Le refresh applicatif ne change rien
 
 Symptômes :
 

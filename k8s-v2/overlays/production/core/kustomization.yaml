@@ -7,7 +7,9 @@ resources:
   - ../../../base/core/backend
   - ../../../base/core/client
   - ../../../base/core/beehub
+  - ingressclass.yaml
   - ingress.yaml
+  - beehub-ingress.yaml
  
 images:
   - name: ghcr.io/algohive-coding-puzzles/api
