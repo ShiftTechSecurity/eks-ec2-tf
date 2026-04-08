@@ -143,6 +143,7 @@ jobs:
         run: |
           set -euo pipefail
           kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Validate required GitHub Secrets
         env:
@@ -153,9 +154,10 @@ jobs:
           CACHE_PASSWORD: ${{ secrets.CACHE_PASSWORD }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
-          required=(POSTGRES_PASSWORD JWT_SECRET DEFAULT_PASSWORD MAIL_PASSWORD CACHE_PASSWORD SECRET_KEY ADMIN_PASSWORD)
+          required=(POSTGRES_PASSWORD JWT_SECRET DEFAULT_PASSWORD MAIL_PASSWORD CACHE_PASSWORD SECRET_KEY ADMIN_PASSWORD GRAFANA_ADMIN_PASSWORD)
           for key in "${required[@]}"; do
             if [ -z "${!key}" ]; then
               echo "Missing required GitHub Secret: $key"
@@ -172,6 +174,7 @@ jobs:
           CACHE_PASSWORD: ${{ secrets.CACHE_PASSWORD }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           kubectl create secret generic algohive-secret \
@@ -190,18 +193,48 @@ jobs:
             --format yaml | \
           kubectl apply -f -
 
+          kubectl create secret generic grafana-admin-credentials \
+            --namespace monitoring \
+            --from-literal=admin-user="admin" \
+            --from-literal=admin-password="$GRAFANA_ADMIN_PASSWORD" \
+            --dry-run=client -o yaml | \
+          kubeseal \
+            --controller-name=sealed-secrets-controller \
+            --controller-namespace=kube-system \
+            --format yaml | \
+          kubectl apply -f -
+
           for attempt in $(seq 1 20); do
             if kubectl get secret algohive-secret -n "$K8S_NAMESPACE" >/dev/null 2>&1; then
               echo "Runtime secret is available."
               kubectl get secret algohive-secret -n "$K8S_NAMESPACE"
-              exit 0
+              break
             fi
             echo "Waiting for runtime secret... attempt ${attempt}/20"
             sleep 10
           done
-          echo "Secret algohive-secret was not materialized by Sealed Secrets."
-          kubectl get sealedsecrets.bitnami.com -n "$K8S_NAMESPACE" || true
-          exit 1
+
+          if ! kubectl get secret algohive-secret -n "$K8S_NAMESPACE" >/dev/null 2>&1; then
+            echo "Secret algohive-secret was not materialized by Sealed Secrets."
+            kubectl get sealedsecrets.bitnami.com -n "$K8S_NAMESPACE" || true
+            exit 1
+          fi
+
+          for attempt in $(seq 1 20); do
+            if kubectl get secret grafana-admin-credentials -n monitoring >/dev/null 2>&1; then
+              echo "Grafana admin secret is available."
+              kubectl get secret grafana-admin-credentials -n monitoring
+              break
+            fi
+            echo "Waiting for Grafana admin secret... attempt ${attempt}/20"
+            sleep 10
+          done
+
+          if ! kubectl get secret grafana-admin-credentials -n monitoring >/dev/null 2>&1; then
+            echo "Secret grafana-admin-credentials was not materialized by Sealed Secrets."
+            kubectl get sealedsecrets.bitnami.com -n monitoring || true
+            exit 1
+          fi
 
       - name: Apply App of Apps
         run: |
@@ -211,7 +244,7 @@ jobs:
       - name: Wait for Applications to exist
         run: |
           set -euo pipefail
-          for app in algohive-root algohive-infrastructure algohive-core algohive-beeapi; do
+          for app in algohive-root algohive-monitoring algohive-kubeview algohive-infrastructure algohive-core algohive-beeapi; do
             for attempt in $(seq 1 20); do
               if kubectl get application "$app" -n argocd >/dev/null 2>&1; then
                 echo "Application $app is present."

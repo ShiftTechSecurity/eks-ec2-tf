@@ -13,6 +13,8 @@ Kubernetes GitOps layer for deploying AlgoHive on AWS EKS with ArgoCD.
 - `beeapi-server-staging`
 - `algohive-db`
 - `algohive-cache`
+- `algohive-monitoring`
+- `algohive-kubeview`
 
 ## Stack
 

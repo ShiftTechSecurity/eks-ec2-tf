@@ -77,6 +77,7 @@ Vérifier que ces secrets existent dans le repo GitHub :
 - `CACHE_PASSWORD`
 - `SECRET_KEY`
 - `ADMIN_PASSWORD`
+- `GRAFANA_ADMIN_PASSWORD`
 
 ### 2. Workflows disponibles
 
@@ -203,6 +204,8 @@ kubectl get applications -n argocd
 kubectl get pods -n algohive
 kubectl get svc -n algohive
 kubectl get ingress -n algohive
+kubectl get svc -n monitoring
+kubectl get svc -n kubeview
 ```
 
 Résultat attendu :
@@ -211,6 +214,7 @@ Résultat attendu :
 - les pods passent en `Running`
 - les services AlgoHive sont présents
 - les Ingress ont une `ADDRESS` AWS
+- les services publics `monitoring-grafana` et `kubeview` ont une `EXTERNAL-IP` ou un hostname AWS
 
 Pods attendus :
 
@@ -234,6 +238,8 @@ Utiliser ensuite les valeurs du champ `ADDRESS` dans le navigateur :
 
 - `algohive-ingress` pour l'application principale
 - `beehub-ingress` pour BeeHub
+- `monitoring-grafana` pour Grafana
+- `kubeview` pour Kubeview
 
 > ℹ️ Ces noms DNS AWS sont générés automatiquement et peuvent changer si l'Ingress est recréé.
 
