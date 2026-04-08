@@ -13,5 +13,5 @@ spec:
   resources:
     requests:
       storage: 500Mi
-  # Sur EKS, on utilise gp2 (par défaut) ou gp3 (recommandé pour les perfs).
-  storageClassName: gp2
+  # Sur EKS Auto Mode, le PVC doit cibler une StorageClass basée sur ebs.csi.eks.amazonaws.com.
+  storageClassName: auto-ebs-sc
