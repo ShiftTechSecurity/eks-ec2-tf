@@ -44,7 +44,7 @@ Montrer que le projet couvre bien toute la chaîne suivante :
 - Nom de cluster par défaut dans les workflows : `algohive-plank-dev`
 - Namespace ArgoCD : `argocd`
 - Namespace applicatif : `algohive`
-- Repo GitOps utilisé par ArgoCD : `https://github.com/ShiftTechSecurity/eks-ec2-tf.git`
+- Repo GitOps utilisé par ArgoCD : `https://github.com/ShiftTechSecurity/AlgoHive-x-Plank-wEKS.git`
 - Branche cible ArgoCD : `main`
 - Pour la démo, l'accès web peut se faire directement via les `ADDRESS` des Ingress AWS
 - Il n'est pas nécessaire de posséder `algohive.dev` pour la démo si les règles Ingress sont sans `host`

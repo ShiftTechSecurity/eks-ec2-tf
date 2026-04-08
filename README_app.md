@@ -38,7 +38,7 @@ Deployment order is enforced with sync waves:
 
 The ArgoCD Applications now point to:
 
-- repo: `https://github.com/ShiftTechSecurity/eks-ec2-tf.git`
+- repo: `https://github.com/ShiftTechSecurity/AlgoHive-x-Plank-wEKS.git`
 - branch: `main`
 
 ## Secrets model

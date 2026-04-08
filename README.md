@@ -66,7 +66,7 @@ In practice, this repo is the junction point between:
 ## Repository Structure
 
 ```text
-eks-ec2-tf/
+AlgoHive-x-Plank-wEKS/
 ├── .github/workflows/          # Terraform, ArgoCD bootstrap, app refresh
 ├── aws/                        # Terraform modules
 ├── docs/                       # Technical and exploitation notes
@@ -353,7 +353,7 @@ Key public components highlighted upstream include:
 
 ## Practical References
 
-- GitOps repository: `https://github.com/ShiftTechSecurity/eks-ec2-tf.git`
+- GitOps repository: `https://github.com/ShiftTechSecurity/AlgoHive-x-Plank-wEKS.git`
 - ArgoCD target branch: `main`
 - AWS region: `eu-west-1`
 - ArgoCD namespace: `argocd`

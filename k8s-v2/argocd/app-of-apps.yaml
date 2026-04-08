@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/ShiftTechSecurity/eks-ec2-tf.git
+    repoURL: https://github.com/ShiftTechSecurity/AlgoHive-x-Plank-wEKS.git
     targetRevision: main
     path: k8s-v2/argocd/apps
   destination:
