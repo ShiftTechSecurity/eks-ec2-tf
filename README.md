@@ -358,3 +358,4 @@ Key public components highlighted upstream include:
 - AWS region: `eu-west-1`
 - ArgoCD namespace: `argocd`
 - Application namespace: `algohive`
+
