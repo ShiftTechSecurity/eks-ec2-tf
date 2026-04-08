@@ -232,16 +232,19 @@ Pour récupérer les URLs de démo :
 
 ```bash
 kubectl get ingress -n algohive -o wide
+kubectl get svc monitoring-grafana -n monitoring -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
+kubectl get svc kubeview -n kubeview -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
 ```
 
 Utiliser ensuite les valeurs du champ `ADDRESS` dans le navigateur :
 
 - `algohive-ingress` pour l'application principale
 - `beehub-ingress` pour BeeHub
-- `monitoring-grafana` pour Grafana
-- `kubeview` pour Kubeview
+- `monitoring-grafana` pour Grafana : `http://<hostname>`
+- `kubeview` pour Kubeview : `http://<hostname>:8000`
 
 > ℹ️ Ces noms DNS AWS sont générés automatiquement et peuvent changer si l'Ingress est recréé.
+> ℹ️ Kubeview est exposé sur le port `8000`, pas sur `80`.
 
 ---
 
@@ -462,6 +465,38 @@ Au minimum, pour la démo :
 
 - montrer que le workflow sait redémarrer les déploiements ;
 - montrer que `imagePullPolicy: Always` est bien présent dans les manifests.
+
+---
+
+### Problème 7 — Grafana ou Kubeview ne sont pas accessibles
+
+Commandes utiles :
+
+```bash
+kubectl get svc -n monitoring
+kubectl get svc -n kubeview
+kubectl get pods -n monitoring
+kubectl get pods -n kubeview
+```
+
+Points à vérifier :
+
+- `monitoring-grafana` doit avoir une `EXTERNAL-IP` ou un hostname AWS
+- `kubeview` doit avoir une `EXTERNAL-IP` ou un hostname AWS
+- `kubeview` doit être ouvert avec `:8000`
+- Grafana doit être ouvert sans port additionnel si le service expose `80`
+
+En secours :
+
+```bash
+kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
+kubectl port-forward svc/kubeview -n kubeview 8000:8000
+```
+
+Puis ouvrir :
+
+- `http://localhost:3000`
+- `http://localhost:8000`
 
 ---
 
