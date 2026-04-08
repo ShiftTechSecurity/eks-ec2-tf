@@ -65,6 +65,26 @@ jobs:
           aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
           kubectl get nodes
 
+      - name: Resolve cluster ARN and capability role ARN
+        run: |
+          set -euo pipefail
+          CLUSTER_ARN="$(aws eks describe-cluster --region "$AWS_REGION" --name "$CLUSTER_NAME" --query 'cluster.arn' --output text)"
+          CAPABILITY_ROLE_ARN="$(aws eks list-access-entries --region "$AWS_REGION" --cluster-name "$CLUSTER_NAME" --query "accessEntries[?contains(@, '-eks-argocd-capability-role')]|[0]" --output text)"
+
+          if [ -z "$CLUSTER_ARN" ] || [ "$CLUSTER_ARN" = "None" ]; then
+            echo "Unable to resolve cluster ARN."
+            exit 1
+          fi
+
+          if [ -z "$CAPABILITY_ROLE_ARN" ] || [ "$CAPABILITY_ROLE_ARN" = "None" ]; then
+            echo "Unable to resolve ArgoCD capability role ARN from EKS access entries."
+            aws eks list-access-entries --region "$AWS_REGION" --cluster-name "$CLUSTER_NAME"
+            exit 1
+          fi
+
+          echo "CLUSTER_ARN=$CLUSTER_ARN" >> "$GITHUB_ENV"
+          echo "CAPABILITY_ROLE_ARN=$CAPABILITY_ROLE_ARN" >> "$GITHUB_ENV"
+
       - name: Wait for managed ArgoCD capability
         run: |
           set -euo pipefail
@@ -88,6 +108,36 @@ jobs:
           set -euo pipefail
           kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.36.0/controller.yaml
           kubectl rollout status deployment/sealed-secrets-controller -n kube-system --timeout=300s
+
+      - name: Register local cluster in ArgoCD
+        run: |
+          set -euo pipefail
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: in-cluster
+            namespace: argocd
+            labels:
+              argocd.argoproj.io/secret-type: cluster
+          type: Opaque
+          stringData:
+            name: in-cluster
+            server: ${CLUSTER_ARN}
+            project: default
+          EOF
+
+          kubectl get secret in-cluster -n argocd
+
+      - name: Grant cluster-admin to ArgoCD capability role for the PoC
+        run: |
+          set -euo pipefail
+          aws eks associate-access-policy \
+            --region "$AWS_REGION" \
+            --cluster-name "$CLUSTER_NAME" \
+            --principal-arn "$CAPABILITY_ROLE_ARN" \
+            --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+            --access-scope type=cluster || true
 
       - name: Ensure application namespace exists
         run: |
