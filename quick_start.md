@@ -1,7 +1,10 @@
-# Guide de démarrage rapide — Démo AlgoHive x PLANK
+# Quick Start — Démo AlgoHive x PLANK
 
-> Guide opératoire pour lancer et démontrer le projet rapidement.  
+> Guide opératoire pour lancer et démontrer le projet rapidement.
 > Objectif : suivre un enchaînement simple demain matin sans improvisation.
+
+> Ce guide est référencé depuis le README principal :
+> [README.md](README.md)
 
 ---
 

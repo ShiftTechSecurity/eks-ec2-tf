@@ -1,173 +1,55 @@
-# AlgoHive x PLANK — Infrastructure AWS + GitOps Kubernetes
+# AlgoHive x PLANK
 
-> Projet académique — Mastère Infrastructures, Sécurité & Cloud  
-> Déploiement d'**AlgoHive** sur **AWS EKS** avec **Terraform**, **ArgoCD** managé par EKS capability, **Kustomize** et **GitHub Actions**.
+> YDAYS Ynov Project
+> AWS EKS infrastructure + GitOps Kubernetes deployment for the AlgoHive platform.
 
----
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AlgoHive-Coding-Puzzles/Ressources/refs/heads/main/images/algohive-logo.png" alt="AlgoHive logo" width="220" />
+</p>
 
-## Contexte
-
-Ce dépôt est le point d'entrée principal du projet **AlgoHive x PLANK**.
-
-Il regroupe deux couches complémentaires :
-
-1. une couche **infrastructure** qui provisionne AWS, le réseau, EKS, les addons et la capability ArgoCD avec Terraform ;
-2. une couche **applicative GitOps** qui déploie AlgoHive sur le cluster via ArgoCD et Kustomize.
-
-L'objectif de ce README est de présenter la vue d'ensemble du dépôt, d'expliquer le flux complet de déploiement et d'indiquer comment les différents workflows GitHub Actions s'articulent.
+AlgoHive is a self-hosted coding game platform designed to publish, organize and solve developer puzzles.
+This repository is the deployment backbone of the **AlgoHive x PLANK** project: it provisions the AWS foundation with Terraform, bootstraps AWS-managed ArgoCD on EKS, and deploys the AlgoHive workloads through GitOps.
 
 ---
 
-## Architecture globale
+## Project Scope
 
-```text
-                    ┌────────────────────────────────────────────┐
-                    │               GitHub Repo                  │
-                    │              eks-ec2-tf                   │
-                    │                                            │
-                    │  Terraform            k8s-v2/              │
-                    │  + GHA infra          + ArgoCD app-of-apps │
-                    └────────────────────────────────────────────┘
-                                      │
-                                      │
-                     ┌────────────────┴────────────────┐
-                     │                                 │
-                     ▼                                 ▼
-        ┌─────────────────────────┐       ┌─────────────────────────┐
-        │ GitHub Actions          │       │ GitHub Actions          │
-        │ terraform-*             │       │ argocd-bootstrap        │
-        │                         │       │ app-refresh-latest      │
-        └─────────────┬───────────┘       └─────────────┬───────────┘
-                      │                                 │
-                      └──────────────┬──────────────────┘
-                                     │
-                                     ▼
-                  ┌────────────────────────────────────────────┐
-                  │             AWS EKS / eu-west-1           │
-                  │                                            │
-                  │  Capability ArgoCD                         │
-                  │  Namespace: argocd                         │
-                  │                                            │
-                  │  Namespace: algohive                       │
-                  │  - Postgres                                │
-                  │  - Redis                                   │
-                  │  - algohive-server                         │
-                  │  - algohive-client                         │
-                  │  - beehub                                  │
-                  │  - beeapi-server-{tlse,mpl,lyon,staging}   │
-                  └────────────────────────────────────────────┘
-```
+This repository combines two complementary layers:
+
+1. **Infrastructure as Code**
+   Provisioning of AWS networking, IAM, EKS, observability and the EKS managed ArgoCD capability.
+2. **Application GitOps**
+   Deployment of AlgoHive, BeeHub and BeeAPI services with Kustomize + ArgoCD `app-of-apps`.
+
+In practice, this repo is the junction point between:
+
+- the **AWS / Terraform** foundation,
+- the **Kubernetes / ArgoCD** application layer,
+- the **GitHub Actions** operational workflows used for bootstrap and refresh.
 
 ---
 
-## Ce que fait ce dépôt
+## Visual Overview
 
-### Couche infrastructure
-
-- Provisionnement du réseau AWS : VPC, subnets, Internet Gateway, NAT Gateway, tables de routage
-- Provisionnement EKS
-- Création des rôles IAM cluster et nodes
-- Installation des addons EKS
-- Création de la capability **AWS-managed ArgoCD**
-- Configuration des accès EKS
-- Mise en place de dashboards et alarmes CloudWatch
-
-### Couche applicative
-
-- Déploiement GitOps via **ArgoCD App of Apps**
-- Organisation Kustomize avec `base/` et `overlays/`
-- Déploiement ordonné avec `sync-wave`
-- Gestion des secrets applicatifs via **GitHub Secrets -> kubeseal -> SealedSecret runtime**
-- Refresh applicatif simple via `kubectl rollout restart` pour les images `latest`
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AlgoHive-Coding-Puzzles/Documentation/refs/heads/main/docs/AlgoHiveArchi.drawio.png" alt="AlgoHive architecture overview" width="900" />
+</p>
 
 ---
 
-## Structure du dépôt
+## What Is Deployed
 
-```text
-eks-ec2-tf/
-├── .github/workflows/          # CI/CD Terraform + bootstrap ArgoCD + refresh app
-├── aws/                        # Modules Terraform AWS
-├── docs/                       # Documentation technique et d'exploitation
-├── k8s-v2/
-│   ├── argocd/                 # Application racine + Applications ArgoCD
-│   ├── base/                   # Manifestes de base
-│   └── overlays/               # Variantes de déploiement
-├── README.md                   # Vue d'ensemble du projet
-├── README_infra.md             # Documentation dédiée à Terraform / AWS / EKS
-└── README_app.md               # Documentation dédiée à Kubernetes / ArgoCD / AlgoHive
-```
+### Infrastructure layer
 
----
+- VPC, public/private subnets, Internet Gateway, NAT Gateway and route tables
+- IAM roles for EKS cluster and nodes
+- Amazon EKS cluster in `eu-west-1`
+- EKS add-ons and observability
+- AWS-managed ArgoCD capability
+- CloudWatch dashboards and alarms
+- Subnet tags required for **EKS Auto Mode ALB** provisioning
 
-## Flux de déploiement retenu
-
-Le fonctionnement actuel du PoC suit ce cycle :
-
-### 1. Provisionnement de l'infrastructure
-
-Le workflow Terraform :
-
-- crée le cluster EKS ;
-- crée la capability ArgoCD ;
-- prépare la fondation réseau, IAM et observabilité.
-
-### 2. Bootstrap GitOps du cluster
-
-Le workflow `argocd-bootstrap.yml` :
-
-- récupère le kubeconfig du cluster ;
-- attend que la capability ArgoCD soit disponible ;
-- installe `sealed-secrets-controller` ;
-- lit les secrets applicatifs depuis les **GitHub Secrets** ;
-- génère un `SealedSecret` à la volée avec `kubeseal` ;
-- applique `k8s-v2/argocd/app-of-apps.yaml`.
-
-### 3. Synchronisation ArgoCD
-
-ArgoCD déploie ensuite :
-
-- `algohive-infrastructure` en wave `-2`
-- `algohive-core` en wave `-1`
-- `algohive-beeapi` en wave `0`
-
-### 4. Refresh applicatif
-
-Les manifests utilisent volontairement `latest`.
-
-Pour faire simple dans le PoC :
-
-- les Deployments utilisent `imagePullPolicy: Always`
-- le workflow `app-refresh-latest.yml` relance les workloads avec `kubectl rollout restart`
-
----
-
-## Workflows GitHub Actions
-
-Les workflows disponibles dans `.github/workflows/` sont :
-
-| Workflow | Rôle |
-|---|---|
-| `terraform-plan-main.yml` | Plan Terraform sur `main` |
-| `terraform-apply-manual.yml` | Apply Terraform manuel |
-| `terraform-destroy-manual.yml` | Destroy Terraform manuel |
-| `argocd-bootstrap.yml` | Bootstrap ArgoCD + Sealed Secrets runtime |
-| `app-refresh-latest.yml` | Redémarrage des workloads applicatifs qui utilisent `latest` |
-
-### Détail du bootstrap ArgoCD
-
-`argocd-bootstrap.yml` est la jonction entre la couche IaC et la couche GitOps.
-
-Il garantit que :
-
-- la capability ArgoCD est bien présente ;
-- les secrets applicatifs ne sont pas stockés dans Git ;
-- le cluster reçoit un `SealedSecret` valide ;
-- l'Application racine ArgoCD est créée proprement.
-
-### Détail du refresh applicatif
-
-`app-refresh-latest.yml` redémarre :
+### Application layer
 
 - `algohive-server`
 - `algohive-client`
@@ -176,47 +58,134 @@ Il garantit que :
 - `beeapi-server-mpl`
 - `beeapi-server-lyon`
 - `beeapi-server-staging`
-
-Ce workflow ne build pas encore les images Docker, car ce dépôt ne contient pas les sources AlgoHive ni leurs Dockerfiles.
+- `algohive-db`
+- `algohive-cache`
 
 ---
 
-## Gestion des secrets
+## Repository Structure
 
-### Ce qui est important à retenir
+```text
+eks-ec2-tf/
+├── .github/workflows/          # Terraform, ArgoCD bootstrap, app refresh
+├── aws/                        # Terraform modules
+├── docs/                       # Technical and exploitation notes
+├── k8s-v2/
+│   ├── argocd/                 # Root app + ArgoCD applications
+│   ├── base/                   # Base manifests
+│   └── overlays/               # Production overlays
+├── quick_start.md              # Demo-oriented runbook
+├── README.md                   # Global overview
+├── README_infra.md             # Infrastructure details
+└── README_app.md               # Application / GitOps details
+```
 
-- Le dépôt peut être **public** sans rendre les **GitHub Secrets** publics.
-- Les secrets GitHub restent privés et sont uniquement consommés par les workflows GitHub Actions.
-- Les secrets applicatifs Kubernetes ne sont **plus versionnés dans le repo**.
+---
 
-### Modèle retenu
+## Deployment Flow
 
-Le flux de secrets est le suivant :
+The current PoC follows this chain:
 
 ```text
 GitHub Secrets
-    │
-    ▼
-Workflow argocd-bootstrap
-    │
-    ├── kubectl create secret --dry-run
-    ├── kubeseal
-    └── kubectl apply
-            │
-            ▼
-SealedSecret / Secret dans le cluster
+    ->
+GitHub Actions Terraform
+    ->
+AWS EKS + managed ArgoCD capability
+    ->
+GitHub Actions argocd-bootstrap
+    ->
+Runtime SealedSecret generation
+    ->
+ArgoCD app-of-apps
+    ->
+AlgoHive workloads on Kubernetes
 ```
 
-### Secrets GitHub attendus
+### 1. Infrastructure provisioning
 
-#### Infrastructure
+The Terraform workflows provision:
+
+- networking,
+- IAM,
+- EKS,
+- add-ons,
+- the managed ArgoCD capability,
+- observability resources.
+
+### 2. ArgoCD bootstrap
+
+The `argocd-bootstrap.yml` workflow:
+
+- connects to the EKS cluster,
+- waits for the managed ArgoCD capability,
+- installs `sealed-secrets-controller`,
+- generates a runtime `SealedSecret` from GitHub Secrets,
+- applies `k8s-v2/argocd/app-of-apps.yaml`.
+
+### 3. ArgoCD synchronization
+
+ArgoCD deploys the application in three ordered blocks:
+
+- `algohive-infrastructure`
+- `algohive-core`
+- `algohive-beeapi`
+
+### 4. Application refresh
+
+This PoC intentionally keeps the `latest` image tag.
+
+To make that workable:
+
+- deployments use `imagePullPolicy: Always`,
+- `app-refresh-latest.yml` performs `kubectl rollout restart` on the live workloads.
+
+---
+
+## GitHub Actions
+
+Available workflows:
+
+| Workflow | Purpose |
+|---|---|
+| `terraform-plan-main.yml` | Terraform plan on `main` |
+| `terraform-apply-manual.yml` | Manual Terraform apply |
+| `terraform-destroy-manual.yml` | Manual Terraform destroy |
+| `argocd-bootstrap.yml` | ArgoCD bootstrap + runtime SealedSecret |
+| `app-refresh-latest.yml` | Workload refresh for `latest` images |
+
+---
+
+## Secrets Model
+
+The repository can remain public without exposing GitHub Secrets.
+
+Current model:
+
+```text
+GitHub Secrets
+    ->
+argocd-bootstrap.yml
+    ->
+kubectl create secret --dry-run
+    ->
+kubeseal
+    ->
+SealedSecret applied to cluster
+    ->
+Secret materialized in namespace algohive
+```
+
+### Required GitHub Secrets
+
+Infrastructure:
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`
 - `TF_BACKEND_BUCKET`
 
-#### Application
+Application:
 
 - `POSTGRES_PASSWORD`
 - `JWT_SECRET`
@@ -226,82 +195,166 @@ SealedSecret / Secret dans le cluster
 - `SECRET_KEY`
 - `ADMIN_PASSWORD`
 
-### Implication opérationnelle
-
-Si le cluster est recréé ou si un secret applicatif change, il faut relancer le workflow `argocd-bootstrap.yml`.
+If the cluster is recreated, or if application secrets change, rerun `argocd-bootstrap.yml`.
 
 ---
 
-## Démarrage rapide
+## ArgoCD and Ingress Notes
 
-### Prérequis
+Recent changes now align the deployment with **EKS Auto Mode**:
 
-- Secrets GitHub configurés
-- Bucket S3 du backend Terraform existant
-- Variables Terraform renseignées
-- Capability ArgoCD activée dans la stack Terraform
+- `IngressClass` `alb` is created with controller `eks.amazonaws.com/alb`
+- public/private subnets are tagged for ALB auto-discovery
+- BeeHub has its own ingress
+- AlgoHive main app uses an ALB ingress without requiring ownership of `algohive.dev`
 
-### Ordre recommandé
+To get the current public endpoints:
 
-1. Lancer `terraform-apply-manual.yml`
-2. Attendre que le cluster et la capability ArgoCD soient prêts
-3. Lancer `argocd-bootstrap.yml`
-4. Vérifier les Applications ArgoCD
-5. Vérifier les pods AlgoHive
+```bash
+kubectl get ingress -n algohive -o wide
+```
 
-### Vérification
+Current entry points are:
+
+- `algohive-ingress` for the main web application
+- `beehub-ingress` for BeeHub
+
+Because ALB DNS names are generated by AWS, they can change if the ingress is recreated.
+
+---
+
+## Demo Access
+
+### Public URLs
+
+Get the live URLs with:
+
+```bash
+kubectl get ingress -n algohive -o wide
+```
+
+### Login credentials
+
+Current deployed credentials:
+
+- Username: `admin`
+- Password: `AdminAlgoHive2026!`
+
+### Fallback for demos
+
+If AWS DNS is still propagating, use port-forward:
+
+```bash
+kubectl port-forward svc/algohive-client -n algohive 8088:80
+kubectl port-forward svc/beehub -n algohive 8081:8081
+```
+
+Then open:
+
+- `http://localhost:8088`
+- `http://localhost:8081`
+
+---
+
+## BeeAPI Catalog Activation In BeeHub
+
+BeeHub requires the API key of each BeeAPI instance to manually activate catalogs.
+
+Use the following commands to retrieve the live keys from the running pods:
+
+```bash
+kubectl exec -it -n algohive beeapi-server-tlse-f7b7b45f7-bffqx -- /bin/sh -c "cat /app/data/.api-key"
+kubectl exec -it -n algohive beeapi-server-mpl-78575c4cd6-v8ptp -- /bin/sh -c "cat /app/data/.api-key"
+kubectl exec -it -n algohive beeapi-server-lyon-6986bc68cf-zbrbx -- /bin/sh -c "cat /app/data/.api-key"
+kubectl exec -it -n algohive beeapi-server-staging-d5d456c89-bg5tf -- /bin/sh -c "cat /app/data/.api-key"
+```
+
+These keys then have to be entered manually in BeeHub to activate the corresponding catalogs.
+
+For a more robust operator workflow, you can also resolve the pods dynamically:
+
+```bash
+kubectl exec -it -n algohive $(kubectl get pod -n algohive -l app=beeapi-server-tlse -o jsonpath="{.items[0].metadata.name}") -- /bin/sh -c "cat /app/data/.api-key"
+kubectl exec -it -n algohive $(kubectl get pod -n algohive -l app=beeapi-server-mpl -o jsonpath="{.items[0].metadata.name}") -- /bin/sh -c "cat /app/data/.api-key"
+kubectl exec -it -n algohive $(kubectl get pod -n algohive -l app=beeapi-server-lyon -o jsonpath="{.items[0].metadata.name}") -- /bin/sh -c "cat /app/data/.api-key"
+kubectl exec -it -n algohive $(kubectl get pod -n algohive -l app=beeapi-server-staging -o jsonpath="{.items[0].metadata.name}") -- /bin/sh -c "cat /app/data/.api-key"
+```
+
+---
+
+## Quick Start
+
+### Minimal sequence
+
+1. Create GitHub Secrets
+2. Run `terraform-plan-main.yml`
+3. Run `terraform-apply-manual.yml`
+4. Run `argocd-bootstrap.yml`
+5. Check ArgoCD applications
+6. Check AlgoHive pods
+7. Run `app-refresh-latest.yml` if needed
+
+### Verification commands
 
 ```bash
 kubectl get applications -n argocd
 kubectl get pods -n algohive
+kubectl get ingress -n algohive -o wide
 ```
 
-### Refresh applicatif
-
-Quand une nouvelle image `latest` est disponible dans GHCR :
-
-1. lancer `app-refresh-latest.yml`
-2. vérifier les nouveaux pods
-
-```bash
-kubectl get pods -n algohive
-```
+For the full demo runbook, use [quick_start.md](quick_start.md).
 
 ---
 
-## Documentation détaillée
+## Current PoC Status
+
+This repository currently covers:
+
+- infrastructure provisioning on AWS,
+- EKS + managed ArgoCD capability,
+- GitOps bootstrap with runtime sealed secrets,
+- Kubernetes deployment of AlgoHive components,
+- ALB exposure for the web interfaces,
+- operational refresh of workloads using `latest`.
+
+This repository does **not** currently contain the AlgoHive application source code or Dockerfiles, so it does not build the platform images locally.
+
+---
+
+## Detailed Documentation
 
 | Document | Description |
 |---|---|
-| [README_infra.md](README_infra.md) | Terraform, modules AWS, capability ArgoCD, workflows infra |
-| [README_app.md](README_app.md) | Kustomize, ArgoCD, secrets runtime, refresh applicatif |
-| [docs/README-TECH.md](docs/README-TECH.md) | Architecture technique de `k8s-v2` |
-| [docs/README-AWS.md](docs/README-AWS.md) | Déploiement AWS/EKS plus détaillé |
-| [docs/README-STRESS.md](docs/README-STRESS.md) | Notes liées aux tests de charge et au HPA |
+| [README_infra.md](README_infra.md) | Terraform, AWS, EKS and managed ArgoCD capability |
+| [README_app.md](README_app.md) | ArgoCD, Kustomize, secrets runtime and workload refresh |
+| [quick_start.md](quick_start.md) | Demo-oriented startup and troubleshooting guide |
+| [docs/README-TECH.md](docs/README-TECH.md) | Additional Kubernetes technical notes |
+| [docs/README-AWS.md](docs/README-AWS.md) | Additional AWS and EKS notes |
+| [docs/README-STRESS.md](docs/README-STRESS.md) | Stress and load-testing notes |
 
 ---
 
-## État actuel du PoC
+## Upstream AlgoHive References
 
-Ce dépôt est volontairement simple :
+This deployment project is based on the broader AlgoHive ecosystem:
 
-- ArgoCD est bien intégré à la capability EKS ;
-- le bootstrap cluster -> secrets -> app-of-apps est automatisé ;
-- les workloads applicatifs peuvent être rafraîchis automatiquement ;
-- la partie **build Docker applicatif** n'est pas encore hébergée dans ce dépôt.
+- AlgoHive GitHub organization: https://github.com/AlgoHive-Coding-Puzzles
+- AlgoHive website: https://algohive.dev
 
-Autrement dit, le dépôt couvre aujourd'hui :
+Key public components highlighted upstream include:
 
-- l'infrastructure ;
-- le bootstrap GitOps ;
-- le déploiement Kubernetes ;
-- le refresh des workloads.
+- AlgoHive Client / API
+- BeeAPI
+- BeeHub
+- HiveCraft
+- BeeToFlow
 
 ---
 
-## Références utiles
+## Practical References
 
-- Repo GitOps : `https://github.com/ShiftTechSecurity/eks-ec2-tf.git`
-- Branche cible ArgoCD : `main`
-- Namespace ArgoCD : `argocd`
-- Namespace applicatif : `algohive`
+- GitOps repository: `https://github.com/ShiftTechSecurity/eks-ec2-tf.git`
+- ArgoCD target branch: `main`
+- AWS region: `eu-west-1`
+- ArgoCD namespace: `argocd`
+- Application namespace: `algohive`
