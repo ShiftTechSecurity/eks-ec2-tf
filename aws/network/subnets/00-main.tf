@@ -22,7 +22,7 @@ resource "aws_subnet" "public" {
   availability_zone       = element(var.availability_zones, count.index)
   map_public_ip_on_launch = true
   tags = merge(var.tags, {
-    Name                   = "${var.project_name}-AZ${count.index + 1}-PublicSubnet${count.index + 1}"
+    Name                     = "${var.project_name}-AZ${count.index + 1}-PublicSubnet${count.index + 1}"
     "kubernetes.io/role/elb" = "1"
   })
 }
@@ -34,7 +34,7 @@ resource "aws_subnet" "private" {
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + var.public_subnet_count)
   availability_zone = element(var.availability_zones, count.index)
   tags = merge(var.tags, {
-    Name                            = "${var.project_name}-AZ${count.index + 1}-PrivateSubnet${count.index + 1}"
+    Name                              = "${var.project_name}-AZ${count.index + 1}-PrivateSubnet${count.index + 1}"
     "kubernetes.io/role/internal-elb" = "1"
   })
 }
